@@ -41,6 +41,14 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
   return result;
 }
 
+// Evaluate slope of a polynomial
+double poly_slope_eval(Eigen::VectorXd coeffs, double x) {
+  double result = 0.0;
+  for (int i = 0; i < coeffs.size() - 1; i++) {
+    result += (i+1) * coeffs[i+1] * pow(x, i);
+  }
+  return result;
+}
 // Fit a polynomial.
 // Adapted from
 // https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
@@ -91,6 +99,38 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          double delta = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+
+          // Adjust state to adjust for latency
+          double dt_late = 0.050;
+          const double Lf = 2.67;
+
+          px = px + v*cos(psi)*dt_late;
+          py = py + v*sin(psi)*dt_late;
+          psi = psi + v * delta * dt_late / Lf;
+          v = v + throttle*0.10*dt_late;
+         
+          //
+          // Convert to vehicle coordinates
+          //
+          vector<double> car_ptsx;
+          vector<double> car_ptsy;
+
+          for (int i=0; i<ptsx.size(); i++){
+
+            // Translate
+            ptsx[i] = ptsx[i] - px;
+            ptsy[i] = ptsy[i] - py;
+
+            // Rotate
+            double car_x = ptsx[i]*cos(psi) + ptsy[i]*sin(psi);
+            double car_y = ptsy[i]*cos(psi) - ptsx[i]*sin(psi);
+
+            // Place in vector
+            car_ptsx.push_back(car_x);
+            car_ptsy.push_back(car_y);
+          }
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -98,8 +138,37 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+
+          double* ptrx = &car_ptsx[0];
+          Eigen::Map<Eigen::VectorXd> ptsx_eig(ptrx,car_ptsx.size());
+
+          double* ptry = &car_ptsy[0];
+          Eigen::Map<Eigen::VectorXd> ptsy_eig(ptry,car_ptsy.size());
+
+          // Fit polynomial for reference line
+          auto coeffs = polyfit(ptsx_eig,ptsy_eig,2);
+
+          std::cout << ptsx_eig << std::endl;
+          std::cout << ptsy_eig << std::endl;
+
+
+          //std::cout << coeffs[0] << std::endl;
+          //std::cout << coeffs[1] << std::endl;
+
+          // Calculate cte and epsi for state vector
+          double cte = coeffs[0];
+          double epsi = -atan(coeffs[1]) ;
+
+    
+          Eigen::VectorXd state(6);
+          state << 0, 0, 0, v, cte, epsi;
+
+
+          // Solve for controls
+          auto controls = mpc.Solve(state, coeffs);
+
+          double steer_value = -controls[0];
+          double throttle_value = controls[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -108,25 +177,34 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
+          //vector<double> mpc_x_vals;
+          //vector<double> mpc_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
-          msgJson["mpc_x"] = mpc_x_vals;
-          msgJson["mpc_y"] = mpc_y_vals;
+          msgJson["mpc_x"] = mpc.x_traj;
+          msgJson["mpc_y"] = mpc.y_traj;
+
+          //msgJson["mpc_x"] = mpc_x_vals;
+          //msgJson["mpc_y"] = mpc_y_vals;
 
           //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
 
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-          // the points in the simulator are connected by a Yellow line
 
-          msgJson["next_x"] = next_x_vals;
-          msgJson["next_y"] = next_y_vals;
+          //std::cout << "car pts x" << std::endl;
+          //for (int i = 0; i < car_ptsx.size(); i++){
+            //next_x_vals.push_back(i*10);
+            //next_y_vals.push_back(0);
+          //}
 
+          //msgJson["next_x"] = next_x_vals;
+          //msgJson["next_y"] = next_y_vals;
+           
+          msgJson["next_x"] = car_ptsx;
+          msgJson["next_y"] = car_ptsy;
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
