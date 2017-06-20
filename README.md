@@ -17,8 +17,9 @@ Actuators are steering angle and throttle
 
 Update equations follow basic dynamics and trigonometry. 
 
-Number of time stamps (N) chosen to be 20 through trial and error.  Early attempts using 50 
+Number of time stamps (N) chosen to be 20 through trial and error.  Early attempts using 50 and higher caused osciallations, making it worse.
 
+Settled on dt = 0.25. Others seem to prefer lower values such as 0.10 but on my computer with those lower values I got oscillations. I suspect they were due to higher computational costs associated with then for correspondingly higher N. These computatinoal costs might have caused some latency.  Since 0.25 seemed to work fine I chose to stick with it rather than deal with additional latency since the project already has a latency in it so I did not want to add more. I notice times when the planned path (green) deviates from the way points (yellow) but that is better the osciallations.
 
 Pre-processing of input data was minimal, except to project global map coordinates to local car coorindates.
 

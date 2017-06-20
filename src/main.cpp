@@ -102,14 +102,24 @@ int main() {
           double delta = j[1]["steering_angle"];
           double throttle = j[1]["throttle"];
 
+
+          // Convert speed from MPH to m/s
+          // critical step that was missing in early version
+          v = 0.44704*v;
+
           // Adjust state to adjust for latency
-          double dt_late = 0.050;
+          double dt_late = 0.100;
           const double Lf = 2.67;
 
           px = px + v*cos(psi)*dt_late;
           py = py + v*sin(psi)*dt_late;
-          psi = psi + v * delta * dt_late / Lf;
-          v = v + throttle*0.10*dt_late;
+          psi = psi - v * delta * dt_late / Lf;
+          //Assume velocity does not change due to latency
+          //Seemed to be emperically accurate when viewing simulator
+          //Previous attempts to predict future velocity required
+          //emperical 'conversion' from throttle [-1,1] to some 
+          //acceleration value. 0.10 was chosen emperically
+          //v = v + throttle*1.00*dt_late;
          
           //
           // Convert to vehicle coordinates
@@ -146,7 +156,7 @@ int main() {
           Eigen::Map<Eigen::VectorXd> ptsy_eig(ptry,car_ptsy.size());
 
           // Fit polynomial for reference line
-          auto coeffs = polyfit(ptsx_eig,ptsy_eig,2);
+          auto coeffs = polyfit(ptsx_eig,ptsy_eig,3);
 
           std::cout << ptsx_eig << std::endl;
           std::cout << ptsy_eig << std::endl;
@@ -156,6 +166,10 @@ int main() {
           //std::cout << coeffs[1] << std::endl;
 
           // Calculate cte and epsi for state vector
+          // Here, since this approach first transforms to the 
+          // vehicle coordinate system, the value for x_car = 0
+          // thus cte and epsi can be calculated using just the 
+          // zeroth order terms for the polynomial and its slope
           double cte = coeffs[0];
           double epsi = -atan(coeffs[1]) ;
 
