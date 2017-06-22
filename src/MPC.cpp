@@ -6,7 +6,7 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 30;
+size_t N = 15;
 double dt = 0.10;
 
 
@@ -38,7 +38,7 @@ AD<double> poly_slope_eval(Eigen::VectorXd coeffs, AD<double> x) {
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-const double ref_v = 30 * 0.44704  ; //MPH * 0.44704 = m/s
+const double ref_v = 50 * 0.44704  ; //MPH * 0.44704 = m/s
 
 
 // The solver takes all the state variables and actuator
@@ -87,20 +87,20 @@ class FG_eval {
 
     // Reference State Cost
     for (int t = 0; t < N; t++){
-      fg[0] += 20*CppAD::pow(vars[cte_start + t],2);
+      fg[0] += 8*CppAD::pow(vars[cte_start + t],2);
       fg[0] += 10*CppAD::pow(vars[epsi_start + t],2);
-      fg[0] += 0.2*CppAD::pow(vars[v_start + t] - ref_v,2); 
+      fg[0] += 0.1*CppAD::pow(vars[v_start + t] - ref_v,2); 
     }
 
     // Actuator magnitude cost
     for (int t = 0; t < N - 1; t++){
-      fg[0] += 400*CppAD::pow(vars[delta_start + t],2);
-      fg[0] += 5*CppAD::pow(vars[a_start + t] , 2);
+      fg[0] += 1500*CppAD::pow(vars[delta_start + t],2);
+      fg[0] += 0.10*CppAD::pow(vars[a_start + t] , 2);
     }
 
     // Actuator delta cost
     for (int t = 0; t < N - 2; t++){
-      fg[0] += 10*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t] , 2);
+      fg[0] += 60*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t] , 2);
       fg[0] += 10*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t] , 2);
     }
 
